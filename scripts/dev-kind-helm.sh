@@ -49,7 +49,11 @@ helm upgrade --install navidrome-operator ./charts/navidrome-operator \
   --set image.pullPolicy=IfNotPresent
 
 echo "==> Applying sample resources"
-kubectl apply -f config/samples/secret.yaml
+if [[ -f config/samples/secret.local.yaml ]]; then
+  kubectl apply -f config/samples/secret.local.yaml
+else
+  kubectl apply -f config/samples/secret.yaml
+fi
 kubectl apply -f config/samples/playlist.yaml
 kubectl apply -f config/samples/track.yaml
 

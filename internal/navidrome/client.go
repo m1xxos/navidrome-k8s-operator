@@ -11,6 +11,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -47,6 +48,9 @@ func (f *HTTPClientFactory) New(baseURL string) Client {
 type HTTPClient struct {
 	baseURL    string
 	httpClient *http.Client
+
+	mu    sync.RWMutex
+	token string
 }
 
 func NewHTTPClient(baseURL string) *HTTPClient {
@@ -81,9 +85,15 @@ func (c *HTTPClient) Login(ctx context.Context, username, password string) error
 		return fmt.Errorf("navidrome login failed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
 	}
 
-	var ignored map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&ignored); err != nil {
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return fmt.Errorf("decode login response: %w", err)
+	}
+
+	if token := pickToken(result); token != "" {
+		c.mu.Lock()
+		c.token = token
+		c.mu.Unlock()
 	}
 
 	return nil
@@ -171,13 +181,39 @@ type playlistInfo struct {
 }
 
 func (c *HTTPClient) listPlaylists(ctx context.Context) ([]playlistInfo, error) {
-	var resp struct {
-		Items []playlistInfo `json:"items"`
-	}
-	if err := c.doJSON(ctx, http.MethodGet, "/api/playlist", nil, &resp); err != nil {
+	var raw any
+	if err := c.doJSON(ctx, http.MethodGet, "/api/playlist", nil, &raw); err != nil {
 		return nil, err
 	}
-	return resp.Items, nil
+
+	if arr, ok := raw.([]any); ok {
+		return parsePlaylistArray(arr), nil
+	}
+
+	if obj, ok := raw.(map[string]any); ok {
+		if arr, ok := obj["items"].([]any); ok {
+			return parsePlaylistArray(arr), nil
+		}
+	}
+
+	return nil, fmt.Errorf("unexpected playlist response format")
+}
+
+func parsePlaylistArray(arr []any) []playlistInfo {
+	out := make([]playlistInfo, 0, len(arr))
+	for _, item := range arr {
+		obj, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, _ := obj["id"].(string)
+		name, _ := obj["name"].(string)
+		if id == "" {
+			continue
+		}
+		out = append(out, playlistInfo{ID: id, Name: name})
+	}
+	return out
 }
 
 func (c *HTTPClient) doJSON(ctx context.Context, method, endpoint string, payload any, out any) error {
@@ -195,6 +231,15 @@ func (c *HTTPClient) doJSON(ctx context.Context, method, endpoint string, payloa
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+
+	c.mu.RLock()
+	token := c.token
+	c.mu.RUnlock()
+	if token != "" {
+		bearer := "Bearer " + token
+		req.Header.Set("Authorization", bearer)
+		req.Header.Set("X-ND-Authorization", bearer)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -217,4 +262,16 @@ func (c *HTTPClient) doJSON(ctx context.Context, method, endpoint string, payloa
 		return err
 	}
 	return nil
+}
+
+func pickToken(m map[string]any) string {
+	keys := []string{"token", "idToken", "jwt", "accessToken"}
+	for _, k := range keys {
+		if raw, ok := m[k]; ok {
+			if s, ok := raw.(string); ok {
+				return s
+			}
+		}
+	}
+	return ""
 }

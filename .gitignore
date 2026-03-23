@@ -10,4 +10,6 @@ cmd/test-navidrome/
 diagnose_auth.go
 test_cookie_auth.go
 test_cookie
+cmd/live-check/
+config/samples/secret.local.yaml
 
