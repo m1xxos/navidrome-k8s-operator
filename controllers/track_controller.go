@@ -60,6 +60,11 @@ func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 	}
 
+	if track.Status.Synced && track.Status.ObservedGeneration == track.Generation {
+		logger.V(1).Info("track already synced for current generation")
+		return ctrl.Result{}, nil
+	}
+
 	if playlist.Status.RemotePlaylistID == "" {
 		return r.failTrackStatus(ctx, track, "PlaylistNotReady", "playlist has no remote ID yet")
 	}
@@ -103,7 +108,7 @@ func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	r.Recorder.Event(track, corev1.EventTypeNormal, "Synced", "Track synced with playlist")
 	logger.Info("track synced", "resolvedTrackID", resolvedTrackID)
-	return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+	return ctrl.Result{}, nil
 }
 
 func (r *TrackReconciler) handleDelete(ctx context.Context, track *navv1alpha1.Track, playlist *navv1alpha1.Playlist) (ctrl.Result, error) {

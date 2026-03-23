@@ -36,14 +36,10 @@ docker build -t "${IMAGE_REPO}:${IMAGE_TAG}" .
 echo "==> Loading image into kind"
 kind load docker-image "${IMAGE_REPO}:${IMAGE_TAG}" --name "${CLUSTER_NAME}"
 
-echo "==> Applying CRDs"
-kubectl apply -f config/crd/bases
-
 echo "==> Installing operator chart"
 helm upgrade --install navidrome-operator ./charts/navidrome-operator \
   -n "${NAMESPACE}" \
   --create-namespace \
-  --skip-crds \
   --set image.repository="${IMAGE_REPO}" \
   --set image.tag="${IMAGE_TAG}" \
   --set image.pullPolicy=IfNotPresent
