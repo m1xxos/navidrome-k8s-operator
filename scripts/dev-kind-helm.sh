@@ -55,7 +55,13 @@ else
   kubectl apply -f config/samples/secret.yaml
 fi
 kubectl apply -f config/samples/playlist.yaml
-kubectl apply -f config/samples/track.yaml
+
+if [[ -f config/samples/tracks.coding.yaml ]]; then
+  kubectl delete track -n default -l navidrome.m1xxos.dev/managed-by=generated --ignore-not-found
+  kubectl apply -f config/samples/tracks.coding.yaml
+else
+  kubectl apply -f config/samples/track.yaml
+fi
 
 echo
 echo "All set. Useful commands:"

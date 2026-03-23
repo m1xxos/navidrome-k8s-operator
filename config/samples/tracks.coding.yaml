@@ -1,0 +1,149 @@
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Track
+metadata:
+  name: coding-vibes-track-01-do-re-mi-fa-so-la-ti-do
+  namespace: default
+  labels:
+    navidrome.m1xxos.dev/managed-by: generated
+    navidrome.m1xxos.dev/playlist: coding-vibes
+spec:
+  playlistRef:
+    name: coding-vibes
+  trackRef:
+    trackID: "BqrMN9YnXYpqrlzUfYmqLl"
+  position: 0
+---
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Track
+metadata:
+  name: coding-vibes-track-02-is-there-really-no-happiness
+  namespace: default
+  labels:
+    navidrome.m1xxos.dev/managed-by: generated
+    navidrome.m1xxos.dev/playlist: coding-vibes
+spec:
+  playlistRef:
+    name: coding-vibes
+  trackRef:
+    trackID: "nyIa7zzSLStPQ4TY1CxQVa"
+  position: 1
+---
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Track
+metadata:
+  name: coding-vibes-track-03-fame-runner
+  namespace: default
+  labels:
+    navidrome.m1xxos.dev/managed-by: generated
+    navidrome.m1xxos.dev/playlist: coding-vibes
+spec:
+  playlistRef:
+    name: coding-vibes
+  trackRef:
+    trackID: "veYHBRyl3zs89H4TbOw3TA"
+  position: 2
+---
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Track
+metadata:
+  name: coding-vibes-track-04-white-tiger
+  namespace: default
+  labels:
+    navidrome.m1xxos.dev/managed-by: generated
+    navidrome.m1xxos.dev/playlist: coding-vibes
+spec:
+  playlistRef:
+    name: coding-vibes
+  trackRef:
+    trackID: "ay80oA0gdfwapIARHTlsnh"
+  position: 3
+---
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Track
+metadata:
+  name: coding-vibes-track-05-flash
+  namespace: default
+  labels:
+    navidrome.m1xxos.dev/managed-by: generated
+    navidrome.m1xxos.dev/playlist: coding-vibes
+spec:
+  playlistRef:
+    name: coding-vibes
+  trackRef:
+    trackID: "L0LRWrzWrIrM4o5rTQc410"
+  position: 4
+---
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Track
+metadata:
+  name: coding-vibes-track-06-track
+  namespace: default
+  labels:
+    navidrome.m1xxos.dev/managed-by: generated
+    navidrome.m1xxos.dev/playlist: coding-vibes
+spec:
+  playlistRef:
+    name: coding-vibes
+  trackRef:
+    trackID: "4vBhhsVMSqsAoJfRIjIdkh"
+  position: 5
+---
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Track
+metadata:
+  name: coding-vibes-track-07-warped-tour-05-with-pete-wentz-feat-pete
+  namespace: default
+  labels:
+    navidrome.m1xxos.dev/managed-by: generated
+    navidrome.m1xxos.dev/playlist: coding-vibes
+spec:
+  playlistRef:
+    name: coding-vibes
+  trackRef:
+    trackID: "iaMyddtV9qKideQjsGg0Ze"
+  position: 6
+---
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Track
+metadata:
+  name: coding-vibes-track-08-teenage-soldier
+  namespace: default
+  labels:
+    navidrome.m1xxos.dev/managed-by: generated
+    navidrome.m1xxos.dev/playlist: coding-vibes
+spec:
+  playlistRef:
+    name: coding-vibes
+  trackRef:
+    trackID: "6N3ble2fPP0hnThY56B5eD"
+  position: 7
+---
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Track
+metadata:
+  name: coding-vibes-track-09-forfeit
+  namespace: default
+  labels:
+    navidrome.m1xxos.dev/managed-by: generated
+    navidrome.m1xxos.dev/playlist: coding-vibes
+spec:
+  playlistRef:
+    name: coding-vibes
+  trackRef:
+    trackID: "MqBJKvZgKCWxyPxMEzf4BY"
+  position: 8
+---
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Track
+metadata:
+  name: coding-vibes-track-10-the-light-upon-the-surface-that-beckoned
+  namespace: default
+  labels:
+    navidrome.m1xxos.dev/managed-by: generated
+    navidrome.m1xxos.dev/playlist: coding-vibes
+spec:
+  playlistRef:
+    name: coding-vibes
+  trackRef:
+    trackID: "2nAtXd0P0zj99r7o6dKmgT"
+  position: 9

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,22 +36,38 @@ type ClientFactory interface {
 	New(baseURL string) Client
 }
 
-type HTTPClientFactory struct{}
+type HTTPClientFactory struct {
+	mu      sync.Mutex
+	clients map[string]*HTTPClient
+}
 
 func NewHTTPClientFactory() *HTTPClientFactory {
-	return &HTTPClientFactory{}
+	return &HTTPClientFactory{clients: map[string]*HTTPClient{}}
 }
 
 func (f *HTTPClientFactory) New(baseURL string) Client {
-	return NewHTTPClient(baseURL)
+	normalized := strings.TrimRight(baseURL, "/")
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if existing, ok := f.clients[normalized]; ok {
+		return existing
+	}
+
+	created := NewHTTPClient(normalized)
+	f.clients[normalized] = created
+	return created
 }
 
 type HTTPClient struct {
 	baseURL    string
 	httpClient *http.Client
 
-	mu    sync.RWMutex
-	token string
+	mu      sync.RWMutex
+	token   string
+	authed  bool
+	loginMu sync.Mutex
 }
 
 func NewHTTPClient(baseURL string) *HTTPClient {
@@ -65,6 +82,50 @@ func NewHTTPClient(baseURL string) *HTTPClient {
 }
 
 func (c *HTTPClient) Login(ctx context.Context, username, password string) error {
+	if c.isAuthenticated() {
+		return nil
+	}
+
+	c.loginMu.Lock()
+	defer c.loginMu.Unlock()
+
+	if c.isAuthenticated() {
+		return nil
+	}
+
+	const maxAttempts = 4
+	backoff := 500 * time.Millisecond
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		err := c.loginOnce(ctx, username, password)
+		if err == nil {
+			return nil
+		}
+
+		if !isRateLimitedLoginError(err) || attempt == maxAttempts {
+			return err
+		}
+
+		delay := backoff
+		if retryAfter, ok := retryAfterFromError(err); ok && retryAfter > delay {
+			delay = retryAfter
+		}
+
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+
+		if backoff < 4*time.Second {
+			backoff *= 2
+		}
+	}
+
+	return errors.New("navidrome login failed after retries")
+}
+
+func (c *HTTPClient) loginOnce(ctx context.Context, username, password string) error {
 	payload := map[string]string{"username": username, "password": password}
 	body, _ := json.Marshal(payload)
 
@@ -82,7 +143,14 @@ func (c *HTTPClient) Login(ctx context.Context, username, password string) error
 
 	if resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("navidrome login failed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
+		msg := fmt.Sprintf("navidrome login failed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
+		if resp.StatusCode == http.StatusTooManyRequests {
+			retryAfter := parseRetryAfter(resp.Header.Get("Retry-After"))
+			if retryAfter > 0 {
+				return fmt.Errorf("%s (retryAfter=%s)", msg, retryAfter)
+			}
+		}
+		return errors.New(msg)
 	}
 
 	var result map[string]any
@@ -93,6 +161,11 @@ func (c *HTTPClient) Login(ctx context.Context, username, password string) error
 	if token := pickToken(result); token != "" {
 		c.mu.Lock()
 		c.token = token
+		c.authed = true
+		c.mu.Unlock()
+	} else {
+		c.mu.Lock()
+		c.authed = true
 		c.mu.Unlock()
 	}
 
@@ -162,9 +235,9 @@ func (c *HTTPClient) ResolveTrack(ctx context.Context, selector TrackSelector) (
 }
 
 func (c *HTTPClient) AddOrMoveTrack(ctx context.Context, playlistID, trackID string, position int) error {
+	_ = position
 	payload := map[string]any{
-		"trackID":  trackID,
-		"position": position,
+		"ids": []string{trackID},
 	}
 	endpoint := fmt.Sprintf("/api/playlist/%s/tracks", url.PathEscape(playlistID))
 	return c.doJSON(ctx, http.MethodPost, endpoint, payload, nil)
@@ -248,6 +321,12 @@ func (c *HTTPClient) doJSON(ctx context.Context, method, endpoint string, payloa
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
+		if resp.StatusCode == http.StatusUnauthorized {
+			c.mu.Lock()
+			c.token = ""
+			c.authed = false
+			c.mu.Unlock()
+		}
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return fmt.Errorf("navidrome api %s %s failed: %d: %s", method, endpoint, resp.StatusCode, strings.TrimSpace(string(b)))
 	}
@@ -262,6 +341,57 @@ func (c *HTTPClient) doJSON(ctx context.Context, method, endpoint string, payloa
 		return err
 	}
 	return nil
+}
+
+func (c *HTTPClient) isAuthenticated() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.token != "" || c.authed
+}
+
+func isRateLimitedLoginError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "status 429")
+}
+
+func retryAfterFromError(err error) (time.Duration, bool) {
+	if err == nil {
+		return 0, false
+	}
+	const marker = "retryAfter="
+	msg := err.Error()
+	idx := strings.LastIndex(msg, marker)
+	if idx < 0 {
+		return 0, false
+	}
+	raw := strings.TrimSuffix(msg[idx+len(marker):], ")")
+	d, parseErr := time.ParseDuration(raw)
+	if parseErr != nil {
+		return 0, false
+	}
+	return d, true
+}
+
+func parseRetryAfter(raw string) time.Duration {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+
+	if sec, err := strconv.Atoi(raw); err == nil && sec > 0 {
+		return time.Duration(sec) * time.Second
+	}
+
+	if t, err := http.ParseTime(raw); err == nil {
+		d := time.Until(t)
+		if d > 0 {
+			return d
+		}
+	}
+
+	return 0
 }
 
 func pickToken(m map[string]any) string {
