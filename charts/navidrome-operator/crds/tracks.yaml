@@ -1,0 +1,53 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: tracks.navidrome.m1xxos.dev
+spec:
+  group: navidrome.m1xxos.dev
+  names:
+    kind: Track
+    listKind: TrackList
+    plural: tracks
+    singular: track
+    shortNames:
+    - ndtr
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            type: object
+            properties:
+              playlistRef:
+                type: object
+              trackRef:
+                type: object
+              position:
+                type: integer
+          status:
+            type: object
+            properties:
+              resolvedTrackID:
+                type: string
+              observedGeneration:
+                type: integer
+                format: int64
+              synced:
+                type: boolean
+              conditions:
+                type: array
+                items:
+                  type: object

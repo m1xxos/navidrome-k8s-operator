@@ -1,0 +1,7 @@
+Thanks for installing navidrome-operator.
+
+Check controller status:
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+Check CRDs:
+  kubectl get crd playlists.navidrome.m1xxos.dev tracks.navidrome.m1xxos.dev

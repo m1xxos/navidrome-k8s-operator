@@ -1,5 +1,4 @@
 package controllers
-package controllers
 
 import (
 	"context"
@@ -19,125 +18,124 @@ import (
 	"github.com/m1xxos/navidrome-k8s-operator/internal/navidrome"
 )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}		Complete(r)		For(&navv1alpha1.Playlist{}).	return ctrl.NewControllerManagedBy(mgr).func (r *PlaylistReconciler) SetupWithManager(mgr ctrl.Manager) error {}	return user, pass, nil	}		return "", "", fmt.Errorf("secret %s/%s must contain username and password", namespace, secretName)	if user == "" || pass == "" {	pass := string(secret.Data["password"])	user := string(secret.Data["username"])	}		return "", "", err	if err := r.Get(ctx, namespacedName(namespace, secretName), secret); err != nil {	secret := &corev1.Secret{}func (r *PlaylistReconciler) readCredentials(ctx context.Context, namespace, secretName string) (string, string, error) {}	return ctrl.Result{RequeueAfter: 20 * time.Second}, nil	r.Recorder.Event(playlist, corev1.EventTypeWarning, reason, message)	_ = r.Status().Update(ctx, playlist)	})		Message: message,		Reason:  reason,		Status:  metav1.ConditionFalse,		Type:    "Ready",	playlist.Status.Conditions = setCondition(playlist.Status.Conditions, metav1.Condition{	playlist.Status.ObservedGeneration = playlist.Generationfunc (r *PlaylistReconciler) failPlaylistStatus(ctx context.Context, playlist *navv1alpha1.Playlist, reason, message string) (ctrl.Result, error) {}	return ctrl.Result{}, nil	}		return ctrl.Result{}, err	if err := r.Update(ctx, playlist); err != nil {	playlist.Finalizers = removeString(playlist.Finalizers, navv1alpha1.PlaylistFinalizer)	}		}			}				}					return ctrl.Result{}, delErr				if delErr := navClient.DeletePlaylist(ctx, playlist.Status.RemotePlaylistID); delErr != nil {			if loginErr := navClient.Login(ctx, user, pass); loginErr == nil {			navClient := r.NavClientFactory.New(playlist.Spec.NavidromeURL)		if err == nil {		user, pass, err := r.readCredentials(ctx, playlist.Namespace, playlist.Spec.AuthSecret)	if playlist.Status.RemotePlaylistID != "" && playlist.Spec.NavidromeURL != "" && playlist.Spec.AuthSecret != "" {	}		return ctrl.Result{}, nil	if !containsString(playlist.Finalizers, navv1alpha1.PlaylistFinalizer) {func (r *PlaylistReconciler) handleDelete(ctx context.Context, playlist *navv1alpha1.Playlist) (ctrl.Result, error) {}	return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil	logger.Info("playlist synced", "remotePlaylistID", remoteID)	r.Recorder.Event(playlist, corev1.EventTypeNormal, "Synced", "Playlist synced with Navidrome")	}		return ctrl.Result{}, err	if err := r.Status().Update(ctx, playlist); err != nil {	})		Message: fmt.Sprintf("Playlist %q synced with Navidrome", playlist.Spec.Name),		Reason:  "Synced",		Status:  metav1.ConditionTrue,		Type:    "Ready",	playlist.Status.Conditions = setCondition(playlist.Status.Conditions, metav1.Condition{	playlist.Status.ObservedGeneration = playlist.Generation	playlist.Status.RemotePlaylistID = remoteID	}		return r.failPlaylistStatus(ctx, playlist, "SyncFailed", err.Error())	if err != nil {	remoteID, err := navClient.EnsurePlaylist(ctx, playlist.Spec.Name)	}		return r.failPlaylistStatus(ctx, playlist, "AuthFailed", err.Error())	if err := navClient.Login(ctx, user, pass); err != nil {	navClient := r.NavClientFactory.New(playlist.Spec.NavidromeURL)	}		return r.failPlaylistStatus(ctx, playlist, "AuthSecretError", err.Error())	if err != nil {	user, pass, err := r.readCredentials(ctx, playlist.Namespace, playlist.Spec.AuthSecret)	}		}			return ctrl.Result{}, err		if err := r.Update(ctx, playlist); err != nil {		playlist.Finalizers = append(playlist.Finalizers, navv1alpha1.PlaylistFinalizer)	if !containsString(playlist.Finalizers, navv1alpha1.PlaylistFinalizer) {	}		return r.handleDelete(ctx, playlist)	if !playlist.DeletionTimestamp.IsZero() {	}		return r.failPlaylistStatus(ctx, playlist, "SpecInvalid", "spec.navidromeURL/spec.name/spec.authSecret are required")	if playlist.Spec.NavidromeURL == "" || playlist.Spec.Name == "" || playlist.Spec.AuthSecret == "" {	}		return ctrl.Result{}, err		}			return ctrl.Result{}, nil		if apierrors.IsNotFound(err) {	if err := r.Get(ctx, req.NamespacedName, playlist); err != nil {	playlist := &navv1alpha1.Playlist{}	logger := log.FromContext(ctx).WithValues("playlist", req.NamespacedName)func (r *PlaylistReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {}	NavClientFactory navidrome.ClientFactory	Recorder         record.EventRecorder	Scheme *runtime.Scheme	client.Clienttype PlaylistReconciler struct {
+type PlaylistReconciler struct {
+	client.Client
+	Scheme *runtime.Scheme
+
+	Recorder         record.EventRecorder
+	NavClientFactory navidrome.ClientFactory
+}
+
+func (r *PlaylistReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues("playlist", req.NamespacedName)
+
+	playlist := &navv1alpha1.Playlist{}
+	if err := r.Get(ctx, req.NamespacedName, playlist); err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
+	}
+
+	if playlist.Spec.NavidromeURL == "" || playlist.Spec.Name == "" || playlist.Spec.AuthSecret == "" {
+		return r.failPlaylistStatus(ctx, playlist, "SpecInvalid", "spec.navidromeURL/spec.name/spec.authSecret are required")
+	}
+
+	if !playlist.DeletionTimestamp.IsZero() {
+		return r.handleDelete(ctx, playlist)
+	}
+
+	if !containsString(playlist.Finalizers, navv1alpha1.PlaylistFinalizer) {
+		playlist.Finalizers = append(playlist.Finalizers, navv1alpha1.PlaylistFinalizer)
+		if err := r.Update(ctx, playlist); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	user, pass, err := r.readCredentials(ctx, playlist.Namespace, playlist.Spec.AuthSecret)
+	if err != nil {
+		return r.failPlaylistStatus(ctx, playlist, "AuthSecretError", err.Error())
+	}
+
+	navClient := r.NavClientFactory.New(playlist.Spec.NavidromeURL)
+	if err := navClient.Login(ctx, user, pass); err != nil {
+		return r.failPlaylistStatus(ctx, playlist, "AuthFailed", err.Error())
+	}
+
+	remoteID, err := navClient.EnsurePlaylist(ctx, playlist.Spec.Name)
+	if err != nil {
+		return r.failPlaylistStatus(ctx, playlist, "SyncFailed", err.Error())
+	}
+
+	playlist.Status.RemotePlaylistID = remoteID
+	playlist.Status.ObservedGeneration = playlist.Generation
+	playlist.Status.Conditions = setCondition(playlist.Status.Conditions, metav1.Condition{
+		Type:    "Ready",
+		Status:  metav1.ConditionTrue,
+		Reason:  "Synced",
+		Message: fmt.Sprintf("Playlist %q synced with Navidrome", playlist.Spec.Name),
+	})
+	if err := r.Status().Update(ctx, playlist); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	r.Recorder.Event(playlist, corev1.EventTypeNormal, "Synced", "Playlist synced with Navidrome")
+	logger.Info("playlist synced", "remotePlaylistID", remoteID)
+	return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+}
+
+func (r *PlaylistReconciler) handleDelete(ctx context.Context, playlist *navv1alpha1.Playlist) (ctrl.Result, error) {
+	if !containsString(playlist.Finalizers, navv1alpha1.PlaylistFinalizer) {
+		return ctrl.Result{}, nil
+	}
+
+	if playlist.Status.RemotePlaylistID != "" && playlist.Spec.NavidromeURL != "" && playlist.Spec.AuthSecret != "" {
+		user, pass, err := r.readCredentials(ctx, playlist.Namespace, playlist.Spec.AuthSecret)
+		if err == nil {
+			navClient := r.NavClientFactory.New(playlist.Spec.NavidromeURL)
+			if loginErr := navClient.Login(ctx, user, pass); loginErr == nil {
+				if delErr := navClient.DeletePlaylist(ctx, playlist.Status.RemotePlaylistID); delErr != nil {
+					return ctrl.Result{}, delErr
+				}
+			}
+		}
+	}
+
+	playlist.Finalizers = removeString(playlist.Finalizers, navv1alpha1.PlaylistFinalizer)
+	if err := r.Update(ctx, playlist); err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *PlaylistReconciler) failPlaylistStatus(ctx context.Context, playlist *navv1alpha1.Playlist, reason, message string) (ctrl.Result, error) {
+	playlist.Status.ObservedGeneration = playlist.Generation
+	playlist.Status.Conditions = setCondition(playlist.Status.Conditions, metav1.Condition{
+		Type:    "Ready",
+		Status:  metav1.ConditionFalse,
+		Reason:  reason,
+		Message: message,
+	})
+	_ = r.Status().Update(ctx, playlist)
+	r.Recorder.Event(playlist, corev1.EventTypeWarning, reason, message)
+	return ctrl.Result{RequeueAfter: 20 * time.Second}, nil
+}
+
+func (r *PlaylistReconciler) readCredentials(ctx context.Context, namespace, secretName string) (string, string, error) {
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, namespacedName(namespace, secretName), secret); err != nil {
+		return "", "", err
+	}
+	user := string(secret.Data["username"])
+	pass := string(secret.Data["password"])
+	if user == "" || pass == "" {
+		return "", "", fmt.Errorf("secret %s/%s must contain username and password", namespace, secretName)
+	}
+	return user, pass, nil
+}
+
+func (r *PlaylistReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&navv1alpha1.Playlist{}).
+		Complete(r)
+}

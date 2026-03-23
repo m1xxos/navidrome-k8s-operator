@@ -1,0 +1,12 @@
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Track
+metadata:
+  name: coding-vibes-track-1
+  namespace: default
+spec:
+  playlistRef:
+    name: coding-vibes
+  trackRef:
+    artist: "Daft Punk"
+    title: "Harder Better Faster Stronger"
+  position: 0

@@ -1,0 +1,9 @@
+apiVersion: navidrome.m1xxos.dev/v1alpha1
+kind: Playlist
+metadata:
+  name: coding-vibes
+  namespace: default
+spec:
+  navidromeURL: "http://navidrome.local"
+  name: "Coding Vibes"
+  authSecret: "navidrome-auth"

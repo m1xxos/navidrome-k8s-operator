@@ -1,0 +1,13 @@
+bin/
+.DS_Store
+*.test
+.coverprofile
+*.broken
+test_live
+test_live.go
+debug_*.go
+cmd/test-navidrome/
+diagnose_auth.go
+test_cookie_auth.go
+test_cookie
+

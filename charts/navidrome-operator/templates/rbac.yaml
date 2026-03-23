@@ -1,0 +1,30 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "navidrome-operator.fullname" . }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets", "events"]
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
+  - apiGroups: ["navidrome.m1xxos.dev"]
+    resources: ["playlists", "tracks"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["navidrome.m1xxos.dev"]
+    resources: ["playlists/status", "tracks/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["navidrome.m1xxos.dev"]
+    resources: ["playlists/finalizers", "tracks/finalizers"]
+    verbs: ["update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "navidrome-operator.fullname" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "navidrome-operator.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "navidrome-operator.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
