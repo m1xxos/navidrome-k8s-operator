@@ -17,6 +17,9 @@ func metaSetStatusCondition(existing []metav1.Condition, newCondition metav1.Con
 	out := make([]metav1.Condition, 0, len(existing)+1)
 	found := false
 	for _, cond := range existing {
+		if cond.Type == "" {
+			continue
+		}
 		if cond.Type == newCondition.Type {
 			found = true
 			if cond.Status == newCondition.Status && cond.Reason == newCondition.Reason && cond.Message == newCondition.Message {
@@ -31,6 +34,15 @@ func metaSetStatusCondition(existing []metav1.Condition, newCondition metav1.Con
 		out = append(out, newCondition)
 	}
 	return out
+}
+
+func isCondition(existing []metav1.Condition, condType string, status metav1.ConditionStatus, reason, message string) bool {
+	for _, cond := range existing {
+		if cond.Type == condType && cond.Status == status && cond.Reason == reason && cond.Message == message {
+			return true
+		}
+	}
+	return false
 }
 
 func containsString(items []string, target string) bool {

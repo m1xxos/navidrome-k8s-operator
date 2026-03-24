@@ -67,13 +67,19 @@ func (r *PlaylistReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return r.failPlaylistStatus(ctx, playlist, "SyncFailed", err.Error())
 	}
 
+	readyMessage := fmt.Sprintf("Playlist %q synced with Navidrome", playlist.Spec.Name)
+	if playlist.Status.RemotePlaylistID == remoteID && playlist.Status.ObservedGeneration == playlist.Generation {
+		logger.V(1).Info("playlist already synced for current generation", "remotePlaylistID", remoteID)
+		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+	}
+
 	playlist.Status.RemotePlaylistID = remoteID
 	playlist.Status.ObservedGeneration = playlist.Generation
 	playlist.Status.Conditions = setCondition(playlist.Status.Conditions, metav1.Condition{
 		Type:    "Ready",
 		Status:  metav1.ConditionTrue,
 		Reason:  "Synced",
-		Message: fmt.Sprintf("Playlist %q synced with Navidrome", playlist.Spec.Name),
+		Message: readyMessage,
 	})
 	if err := r.Status().Update(ctx, playlist); err != nil {
 		return ctrl.Result{}, err

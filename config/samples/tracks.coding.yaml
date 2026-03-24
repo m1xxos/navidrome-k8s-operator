@@ -11,7 +11,7 @@ spec:
     name: coding-vibes
   trackRef:
     trackID: "BqrMN9YnXYpqrlzUfYmqLl"
-  position: 0
+  priority: 0
 ---
 apiVersion: navidrome.m1xxos.dev/v1alpha1
 kind: Track
@@ -26,7 +26,7 @@ spec:
     name: coding-vibes
   trackRef:
     trackID: "nyIa7zzSLStPQ4TY1CxQVa"
-  position: 1
+  priority: 1
 ---
 apiVersion: navidrome.m1xxos.dev/v1alpha1
 kind: Track
@@ -41,7 +41,7 @@ spec:
     name: coding-vibes
   trackRef:
     trackID: "veYHBRyl3zs89H4TbOw3TA"
-  position: 2
+  priority: 2
 ---
 apiVersion: navidrome.m1xxos.dev/v1alpha1
 kind: Track
@@ -56,7 +56,7 @@ spec:
     name: coding-vibes
   trackRef:
     trackID: "ay80oA0gdfwapIARHTlsnh"
-  position: 3
+  priority: 3
 ---
 apiVersion: navidrome.m1xxos.dev/v1alpha1
 kind: Track
@@ -71,7 +71,7 @@ spec:
     name: coding-vibes
   trackRef:
     trackID: "L0LRWrzWrIrM4o5rTQc410"
-  position: 4
+  priority: 4
 ---
 apiVersion: navidrome.m1xxos.dev/v1alpha1
 kind: Track
@@ -86,7 +86,7 @@ spec:
     name: coding-vibes
   trackRef:
     trackID: "4vBhhsVMSqsAoJfRIjIdkh"
-  position: 5
+  priority: 5
 ---
 apiVersion: navidrome.m1xxos.dev/v1alpha1
 kind: Track
@@ -101,7 +101,7 @@ spec:
     name: coding-vibes
   trackRef:
     trackID: "iaMyddtV9qKideQjsGg0Ze"
-  position: 6
+  priority: 6
 ---
 apiVersion: navidrome.m1xxos.dev/v1alpha1
 kind: Track
@@ -116,7 +116,7 @@ spec:
     name: coding-vibes
   trackRef:
     trackID: "6N3ble2fPP0hnThY56B5eD"
-  position: 7
+  priority: 7
 ---
 apiVersion: navidrome.m1xxos.dev/v1alpha1
 kind: Track
@@ -131,7 +131,7 @@ spec:
     name: coding-vibes
   trackRef:
     trackID: "MqBJKvZgKCWxyPxMEzf4BY"
-  position: 8
+  priority: 8
 ---
 apiVersion: navidrome.m1xxos.dev/v1alpha1
 kind: Track
@@ -146,4 +146,4 @@ spec:
     name: coding-vibes
   trackRef:
     trackID: "2nAtXd0P0zj99r7o6dKmgT"
-  position: 9
+  priority: 9

@@ -29,7 +29,7 @@ type Client interface {
 	DeletePlaylist(ctx context.Context, playlistID string) error
 	ResolveTrack(ctx context.Context, selector TrackSelector) (string, error)
 	AddOrMoveTrack(ctx context.Context, playlistID, trackID string, position int) error
-	RemoveTrack(ctx context.Context, playlistID, trackID string) error
+	RemoveTrack(ctx context.Context, playlistID, trackID string, position int) error
 }
 
 type ClientFactory interface {
@@ -235,16 +235,151 @@ func (c *HTTPClient) ResolveTrack(ctx context.Context, selector TrackSelector) (
 }
 
 func (c *HTTPClient) AddOrMoveTrack(ctx context.Context, playlistID, trackID string, position int) error {
-	_ = position
-	payload := map[string]any{
-		"ids": []string{trackID},
+	if position < 0 {
+		position = 0
 	}
-	endpoint := fmt.Sprintf("/api/playlist/%s/tracks", url.PathEscape(playlistID))
-	return c.doJSON(ctx, http.MethodPost, endpoint, payload, nil)
+
+	tracks, err := c.listPlaylistTracks(ctx, playlistID)
+	if err != nil {
+		return err
+	}
+
+	trackPosIDs := findPlaylistTrackPositionIDs(tracks, trackID)
+	for i := len(trackPosIDs) - 1; i >= 1; i-- {
+		if err := c.deletePlaylistTrackByPositionID(ctx, playlistID, trackPosIDs[i]); err != nil {
+			return err
+		}
+	}
+
+	if len(trackPosIDs) > 1 {
+		tracks, err = c.listPlaylistTracks(ctx, playlistID)
+		if err != nil {
+			return err
+		}
+		trackPosIDs = findPlaylistTrackPositionIDs(tracks, trackID)
+	}
+
+	trackPosID := ""
+	if len(trackPosIDs) > 0 {
+		trackPosID = trackPosIDs[0]
+	}
+	if trackPosID == "" {
+		payload := map[string]any{
+			"ids": []string{trackID},
+		}
+		endpoint := fmt.Sprintf("/api/playlist/%s/tracks", url.PathEscape(playlistID))
+		if err := c.doJSON(ctx, http.MethodPost, endpoint, payload, nil); err != nil {
+			return err
+		}
+
+		tracks, err = c.listPlaylistTracks(ctx, playlistID)
+		if err != nil {
+			return err
+		}
+		trackPosID = findPlaylistTrackPositionID(tracks, trackID)
+		if trackPosID == "" {
+			return fmt.Errorf("track %q not found in playlist after add", trackID)
+		}
+	}
+
+	desiredPosID := strconv.Itoa(position + 1)
+	if trackPosID == desiredPosID {
+		return nil
+	}
+
+	reorderPayload := map[string]string{"insert_before": desiredPosID}
+	reorderEndpoint := fmt.Sprintf("/api/playlist/%s/tracks/%s", url.PathEscape(playlistID), url.PathEscape(trackPosID))
+	return c.doJSON(ctx, http.MethodPut, reorderEndpoint, reorderPayload, nil)
 }
 
-func (c *HTTPClient) RemoveTrack(ctx context.Context, playlistID, trackID string) error {
-	endpoint := fmt.Sprintf("/api/playlist/%s/tracks/%s", url.PathEscape(playlistID), url.PathEscape(trackID))
+func (c *HTTPClient) RemoveTrack(ctx context.Context, playlistID, trackID string, position int) error {
+	tracks, err := c.listPlaylistTracks(ctx, playlistID)
+	if err != nil {
+		return err
+	}
+
+	if position >= 0 && position < len(tracks) {
+		candidatePosID := tracks[position].ID
+		if candidatePosID != "" {
+			return c.deletePlaylistTrackByPositionID(ctx, playlistID, candidatePosID)
+		}
+	}
+
+	trackPosID := findPlaylistTrackPositionID(tracks, trackID)
+	if trackPosID == "" {
+		return nil
+	}
+	return c.deletePlaylistTrackByPositionID(ctx, playlistID, trackPosID)
+}
+
+type playlistTrackInfo struct {
+	ID          string
+	MediaFileID string
+}
+
+func (c *HTTPClient) listPlaylistTracks(ctx context.Context, playlistID string) ([]playlistTrackInfo, error) {
+	endpoint := fmt.Sprintf("/api/playlist/%s/tracks", url.PathEscape(playlistID))
+	var raw any
+	if err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &raw); err != nil {
+		return nil, err
+	}
+
+	if arr, ok := raw.([]any); ok {
+		return parsePlaylistTracksArray(arr), nil
+	}
+	if obj, ok := raw.(map[string]any); ok {
+		if arr, ok := obj["items"].([]any); ok {
+			return parsePlaylistTracksArray(arr), nil
+		}
+	}
+
+	return nil, fmt.Errorf("unexpected playlist tracks response format")
+}
+
+func parsePlaylistTracksArray(arr []any) []playlistTrackInfo {
+	out := make([]playlistTrackInfo, 0, len(arr))
+	for _, item := range arr {
+		obj, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, _ := obj["id"].(string)
+		mfID, _ := obj["mediaFileId"].(string)
+		if mfID == "" {
+			if mf, ok := obj["mediaFile"].(map[string]any); ok {
+				mfID, _ = mf["id"].(string)
+			}
+		}
+		if id == "" {
+			continue
+		}
+		out = append(out, playlistTrackInfo{ID: id, MediaFileID: mfID})
+	}
+	return out
+}
+
+func findPlaylistTrackPositionID(tracks []playlistTrackInfo, mediaFileID string) string {
+	ids := findPlaylistTrackPositionIDs(tracks, mediaFileID)
+	if len(ids) == 0 {
+		return ""
+	}
+	return ids[0]
+}
+
+func findPlaylistTrackPositionIDs(tracks []playlistTrackInfo, mediaFileID string) []string {
+	out := make([]string, 0)
+	for _, tr := range tracks {
+		if tr.MediaFileID == mediaFileID {
+			out = append(out, tr.ID)
+		}
+	}
+	return out
+}
+
+func (c *HTTPClient) deletePlaylistTrackByPositionID(ctx context.Context, playlistID, posID string) error {
+	q := url.Values{}
+	q.Add("id", posID)
+	endpoint := fmt.Sprintf("/api/playlist/%s/tracks?%s", url.PathEscape(playlistID), q.Encode())
 	return c.doJSON(ctx, http.MethodDelete, endpoint, nil, nil)
 }
 

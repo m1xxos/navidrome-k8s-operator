@@ -30,13 +30,31 @@ spec:
             type: object
           spec:
             type: object
+            required: [ playlistRef, trackRef ]
             properties:
               playlistRef:
                 type: object
+                required: [ name ]
+                properties:
+                  name:
+                    type: string
               trackRef:
                 type: object
+                properties:
+                  trackID:
+                    type: string
+                  filePath:
+                    type: string
+                  artist:
+                    type: string
+                  title:
+                    type: string
+              priority:
+                type: integer
+                minimum: 0
               position:
                 type: integer
+                minimum: 0
           status:
             type: object
             properties:
@@ -51,3 +69,19 @@ spec:
                 type: array
                 items:
                   type: object
+                  required: [ type, status, reason, message, lastTransitionTime ]
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                    observedGeneration:
+                      type: integer
+                      format: int64
+                    lastTransitionTime:
+                      type: string
+                      format: date-time

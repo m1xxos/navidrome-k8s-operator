@@ -89,7 +89,8 @@ func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return r.failTrackStatus(ctx, track, "TrackResolveFailed", err.Error())
 	}
 
-	if err := navClient.AddOrMoveTrack(ctx, playlist.Status.RemotePlaylistID, resolvedTrackID, track.Spec.Position); err != nil {
+	orderIndex := trackOrder(track.Spec)
+	if err := navClient.AddOrMoveTrack(ctx, playlist.Status.RemotePlaylistID, resolvedTrackID, orderIndex); err != nil {
 		return r.failTrackStatus(ctx, track, "SyncFailed", err.Error())
 	}
 
@@ -121,7 +122,7 @@ func (r *TrackReconciler) handleDelete(ctx context.Context, track *navv1alpha1.T
 		if err == nil {
 			navClient := r.NavClientFactory.New(playlist.Spec.NavidromeURL)
 			if loginErr := navClient.Login(ctx, user, pass); loginErr == nil {
-				if rmErr := navClient.RemoveTrack(ctx, playlist.Status.RemotePlaylistID, track.Status.ResolvedTrackID); rmErr != nil {
+				if rmErr := navClient.RemoveTrack(ctx, playlist.Status.RemotePlaylistID, track.Status.ResolvedTrackID, trackOrder(track.Spec)); rmErr != nil {
 					return ctrl.Result{}, rmErr
 				}
 			}
@@ -166,4 +167,17 @@ func (r *TrackReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&navv1alpha1.Track{}).
 		Complete(r)
+}
+
+func trackOrder(spec navv1alpha1.TrackSpec) int {
+	if spec.Priority != nil {
+		if *spec.Priority < 0 {
+			return 0
+		}
+		return *spec.Priority
+	}
+	if spec.Position < 0 {
+		return 0
+	}
+	return spec.Position
 }

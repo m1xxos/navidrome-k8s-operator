@@ -50,6 +50,7 @@ type PlaylistRef struct {
 type TrackSpec struct {
 	PlaylistRef PlaylistRef `json:"playlistRef"`
 	TrackRef    TrackRef    `json:"trackRef"`
+	Priority    *int        `json:"priority,omitempty"`
 	Position    int         `json:"position,omitempty"`
 }
 

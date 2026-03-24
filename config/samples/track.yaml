@@ -9,4 +9,4 @@ spec:
   trackRef:
     artist: "Daft Punk"
     title: "Harder Better Faster Stronger"
-  position: 0
+  priority: 0

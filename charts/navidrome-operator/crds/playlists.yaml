@@ -50,3 +50,19 @@ spec:
                 type: array
                 items:
                   type: object
+                  required: [ type, status, reason, message, lastTransitionTime ]
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                    observedGeneration:
+                      type: integer
+                      format: int64
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
