@@ -50,6 +50,7 @@ func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	if !track.DeletionTimestamp.IsZero() {
+		logger.Info("Started reconciling Track deletion", "resolvedTrackID", track.Status.ResolvedTrackID, "order", trackOrder(track.Spec))
 		return r.handleDelete(ctx, track, playlist)
 	}
 
@@ -61,7 +62,7 @@ func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	if track.Status.Synced && track.Status.ObservedGeneration == track.Generation {
-		logger.V(1).Info("track already synced for current generation")
+		logger.V(1).Info("Track was already synced", "generation", track.Generation)
 		return ctrl.Result{}, nil
 	}
 
@@ -90,6 +91,7 @@ func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	orderIndex := trackOrder(track.Spec)
+	logger.Info("Syncing Track with Playlist", "remotePlaylistID", playlist.Status.RemotePlaylistID, "order", orderIndex)
 	if err := navClient.AddOrMoveTrack(ctx, playlist.Status.RemotePlaylistID, resolvedTrackID, orderIndex); err != nil {
 		return r.failTrackStatus(ctx, track, "SyncFailed", err.Error())
 	}
@@ -108,12 +110,15 @@ func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	r.Recorder.Event(track, corev1.EventTypeNormal, "Synced", "Track synced with playlist")
-	logger.Info("track synced", "resolvedTrackID", resolvedTrackID)
+	logger.Info("Synced Track with Playlist", "resolvedTrackID", resolvedTrackID, "order", orderIndex, "generation", track.Generation)
 	return ctrl.Result{}, nil
 }
 
 func (r *TrackReconciler) handleDelete(ctx context.Context, track *navv1alpha1.Track, playlist *navv1alpha1.Playlist) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues("track", client.ObjectKeyFromObject(track))
+
 	if !containsString(track.Finalizers, navv1alpha1.TrackFinalizer) {
+		logger.V(1).Info("Track finalizer was already removed")
 		return ctrl.Result{}, nil
 	}
 
@@ -125,18 +130,25 @@ func (r *TrackReconciler) handleDelete(ctx context.Context, track *navv1alpha1.T
 				if rmErr := navClient.RemoveTrack(ctx, playlist.Status.RemotePlaylistID, track.Status.ResolvedTrackID, trackOrder(track.Spec)); rmErr != nil {
 					return ctrl.Result{}, rmErr
 				}
+				logger.Info("Deleted Track from Playlist", "remotePlaylistID", playlist.Status.RemotePlaylistID, "resolvedTrackID", track.Status.ResolvedTrackID, "order", trackOrder(track.Spec))
 			}
 		}
+	} else {
+		logger.Info("Skipped Track remote cleanup", "hasPlaylist", playlist != nil, "hasRemotePlaylistID", playlist != nil && playlist.Status.RemotePlaylistID != "", "hasResolvedTrackID", track.Status.ResolvedTrackID != "")
 	}
 
 	track.Finalizers = removeString(track.Finalizers, navv1alpha1.TrackFinalizer)
 	if err := r.Update(ctx, track); err != nil {
 		return ctrl.Result{}, err
 	}
+	logger.Info("Removed Track finalizer")
 	return ctrl.Result{}, nil
 }
 
 func (r *TrackReconciler) failTrackStatus(ctx context.Context, track *navv1alpha1.Track, reason, message string) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues("track", client.ObjectKeyFromObject(track))
+	logger.Error(fmt.Errorf("%s", message), "Failed to sync Track", "reason", reason)
+
 	track.Status.ObservedGeneration = track.Generation
 	track.Status.Synced = false
 	track.Status.Conditions = setCondition(track.Status.Conditions, metav1.Condition{

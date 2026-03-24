@@ -69,7 +69,7 @@ func (r *PlaylistReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	readyMessage := fmt.Sprintf("Playlist %q synced with Navidrome", playlist.Spec.Name)
 	if playlist.Status.RemotePlaylistID == remoteID && playlist.Status.ObservedGeneration == playlist.Generation {
-		logger.V(1).Info("playlist already synced for current generation", "remotePlaylistID", remoteID)
+		logger.V(1).Info("Playlist was already synced", "remotePlaylistID", remoteID, "generation", playlist.Generation)
 		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 	}
 
@@ -86,7 +86,7 @@ func (r *PlaylistReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	r.Recorder.Event(playlist, corev1.EventTypeNormal, "Synced", "Playlist synced with Navidrome")
-	logger.Info("playlist synced", "remotePlaylistID", remoteID)
+	logger.Info("Synced Playlist with Navidrome", "remotePlaylistID", remoteID, "generation", playlist.Generation)
 	return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 }
 
@@ -115,6 +115,9 @@ func (r *PlaylistReconciler) handleDelete(ctx context.Context, playlist *navv1al
 }
 
 func (r *PlaylistReconciler) failPlaylistStatus(ctx context.Context, playlist *navv1alpha1.Playlist, reason, message string) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues("playlist", client.ObjectKeyFromObject(playlist))
+	logger.Error(fmt.Errorf("%s", message), "Failed to sync Playlist", "reason", reason)
+
 	playlist.Status.ObservedGeneration = playlist.Generation
 	playlist.Status.Conditions = setCondition(playlist.Status.Conditions, metav1.Condition{
 		Type:    "Ready",
