@@ -1,31 +1,36 @@
-# Navidrome Kubernetes Operator (for Playlists and Musical Chaos)
+# Navidrome Kubernetes Operator
 
-Этот оператор следит за двумя кастомными ресурсами в Kubernetes:
+Оператор синхронизирует кастомные ресурсы Kubernetes с Navidrome:
 
-- `Playlist` - говорит, какой плейлист должен жить в Navidrome.
-- `Track` - говорит, какой трек должен жить внутри конкретного `Playlist`.
+- `Playlist` - управляет удаленным плейлистом в Navidrome
+- `Track` - управляет треком внутри конкретного `Playlist`
 
-Оператор автоматически:
+## Что умеет сейчас
 
-- создает плейлисты,
-- обновляет их,
-- удаляет их,
-- добавляет/переупорядочивает треки,
-- удаляет треки из плейлиста при удалении `Track` ресурса.
+- Создавать/обновлять/удалять плейлисты в Navidrome
+- Добавлять трек в плейлист
+- Перемещать трек в нужную позицию
+- Удалять трек из плейлиста при удалении ресурса `Track`
+- Работать идемпотентно (без повторного "добавления того же самого" при стабильном состоянии)
+- Логировать синк в стиле Kubernetes logging conventions (структурированные `Info`/`Error`)
 
+## Как работает синк
 
-## Как это работает
-
-1. `Playlist` содержит URL Navidrome, имя плейлиста и Secret с логином/паролем.
-2. `Track` ссылается на `Playlist` и описывает трек:
-   - `trackID`, или
-   - `filePath`, или
-   - `artist + title`.
-3. Контроллеры синхронизируют фактическое состояние в Navidrome с декларативным состоянием в Kubernetes.
+1. `Playlist` содержит:
+   - `spec.navidromeURL`
+   - `spec.name`
+   - `spec.authSecret` (Secret с `username`/`password`)
+2. `Track` ссылается на `Playlist` и определяет трек через одно из полей:
+   - `trackRef.trackID`
+   - `trackRef.filePath`
+   - `trackRef.artist + trackRef.title`
+3. Порядок треков:
+   - приоритетно используется `spec.priority`
+   - `spec.position` поддерживается как fallback для обратной совместимости
 
 ## Быстрый старт (kind + helm)
 
-Убедись, что установлены `kind`, `kubectl`, `helm`, `go`.
+Требования: `kind`, `kubectl`, `helm`, `go`, `docker`.
 
 ```bash
 make tidy
@@ -33,7 +38,7 @@ chmod +x scripts/dev-kind-helm.sh
 ./scripts/dev-kind-helm.sh
 ```
 
-После этого проверь:
+Проверка:
 
 ```bash
 kubectl get playlists,tracks -A
@@ -41,9 +46,44 @@ kubectl get pods -n navidrome-operator
 kubectl logs -n navidrome-operator deploy/navidrome-operator-navidrome-operator -f
 ```
 
+## Установка Helm chart (локально)
+
+```bash
+helm upgrade --install navidrome-operator ./charts/navidrome-operator \
+  -n navidrome-operator \
+  --create-namespace
+```
+
+Удаление:
+
+```bash
+helm uninstall navidrome-operator -n navidrome-operator
+```
+
+## Установка через Helm Repo (`helm repo add` + `helm install`)
+
+Если chart опубликован как Helm repository (например, через GitHub Pages), установка выглядит так:
+
+```bash
+helm repo add m1xxos https://m1xxos.github.io/navidrome-k8s-operator
+helm repo update
+
+helm install navidrome-operator m1xxos/navidrome-operator \
+  -n navidrome-operator \
+  --create-namespace
+```
+
+Обновление:
+
+```bash
+helm upgrade navidrome-operator m1xxos/navidrome-operator -n navidrome-operator
+```
+
+Примечание: если chart repo развернут по другому URL, замени адрес в `helm repo add`.
+
 ## Примеры ресурсов
 
-Секрет авторизации:
+### Secret авторизации
 
 ```yaml
 apiVersion: v1
@@ -57,7 +97,7 @@ stringData:
   password: your-password
 ```
 
-Playlist:
+### Playlist
 
 ```yaml
 apiVersion: navidrome.m1xxos.dev/v1alpha1
@@ -66,12 +106,12 @@ metadata:
   name: coding-vibes
   namespace: default
 spec:
-  navidromeURL: "http://navidrome.local"
+  navidromeURL: "https://music.example.com"
   name: "Coding Vibes"
   authSecret: "navidrome-auth"
 ```
 
-Track:
+### Track
 
 ```yaml
 apiVersion: navidrome.m1xxos.dev/v1alpha1
@@ -85,14 +125,17 @@ spec:
   trackRef:
     artist: "Daft Punk"
     title: "Harder Better Faster Stronger"
-  position: 0
+  priority: 0
 ```
 
-## Важные заметки
+## Полезные команды
 
-- Navidrome уже должен быть доступен по URL из `Playlist.spec.navidromeURL`.
-- Secret должен содержать ключи `username` и `password`.
-- Если трек не находится по метаданным, попробуй сначала использовать `trackID`.
+```bash
+kubectl get playlist coding-vibes -n default -o yaml
+kubectl get tracks -n default
+kubectl describe track coding-vibes-track-1 -n default
+kubectl logs -n navidrome-operator deploy/navidrome-operator-navidrome-operator --since=10m
+```
 
 ## Development
 
