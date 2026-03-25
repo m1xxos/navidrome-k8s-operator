@@ -26,6 +26,8 @@ type TrackReconciler struct {
 	NavClientFactory navidrome.ClientFactory
 }
 
+const trackResyncInterval = 2 * time.Minute
+
 func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("track", req.NamespacedName)
 
@@ -61,11 +63,6 @@ func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 	}
 
-	if track.Status.Synced && track.Status.ObservedGeneration == track.Generation {
-		logger.V(1).Info("Track was already synced", "generation", track.Generation)
-		return ctrl.Result{}, nil
-	}
-
 	if playlist.Status.RemotePlaylistID == "" {
 		return r.failTrackStatus(ctx, track, "PlaylistNotReady", "playlist has no remote ID yet")
 	}
@@ -96,6 +93,15 @@ func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return r.failTrackStatus(ctx, track, "SyncFailed", err.Error())
 	}
 
+	readyMessage := fmt.Sprintf("Track synced in playlist %q", playlist.Spec.Name)
+	if track.Status.Synced &&
+		track.Status.ResolvedTrackID == resolvedTrackID &&
+		track.Status.ObservedGeneration == track.Generation &&
+		isCondition(track.Status.Conditions, "Ready", metav1.ConditionTrue, "Synced", readyMessage) {
+		logger.V(1).Info("Track status was already up to date", "resolvedTrackID", resolvedTrackID, "generation", track.Generation)
+		return ctrl.Result{RequeueAfter: trackResyncInterval}, nil
+	}
+
 	track.Status.ResolvedTrackID = resolvedTrackID
 	track.Status.ObservedGeneration = track.Generation
 	track.Status.Synced = true
@@ -103,7 +109,7 @@ func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		Type:    "Ready",
 		Status:  metav1.ConditionTrue,
 		Reason:  "Synced",
-		Message: fmt.Sprintf("Track synced in playlist %q", playlist.Spec.Name),
+		Message: readyMessage,
 	})
 	if err := r.Status().Update(ctx, track); err != nil {
 		return ctrl.Result{}, err
@@ -111,7 +117,7 @@ func (r *TrackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	r.Recorder.Event(track, corev1.EventTypeNormal, "Synced", "Track synced with playlist")
 	logger.Info("Synced Track with Playlist", "resolvedTrackID", resolvedTrackID, "order", orderIndex, "generation", track.Generation)
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: trackResyncInterval}, nil
 }
 
 func (r *TrackReconciler) handleDelete(ctx context.Context, track *navv1alpha1.Track, playlist *navv1alpha1.Playlist) (ctrl.Result, error) {

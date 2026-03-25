@@ -16,6 +16,19 @@ spec:
   - name: v1alpha1
     served: true
     storage: true
+    additionalPrinterColumns:
+    - name: Ready
+      type: string
+      jsonPath: .status.conditions[0].status
+    - name: Reason
+      type: string
+      jsonPath: .status.conditions[0].reason
+    - name: RemoteID
+      type: string
+      jsonPath: .status.remotePlaylistID
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
     subresources:
       status: {}
     schema:
