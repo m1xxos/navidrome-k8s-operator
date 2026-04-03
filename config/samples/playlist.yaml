@@ -4,6 +4,6 @@ metadata:
   name: coding-vibes
   namespace: default
 spec:
-  navidromeURL: "https://music.m1xxos.tech"
+  navidromeURL: "https://music.m1xxos.online"
   name: "Coding Vibes"
   authSecret: "navidrome-auth"
